@@ -226,6 +226,7 @@ function connectWebSocket() {
     ws.onmessage = (event) => {
         if (typeof event.data === 'string') {
             if (event.data.startsWith('Error:')) {
+                hideToast();  // drop any "fetching..." notice; the fetch failed
                 statusEl.textContent = event.data;
                 statusEl.style.color = '#ff0000';
                 if (ws) ws.close();
@@ -545,6 +546,7 @@ function stopBufferReports() {
 // Unexpected disconnect toast. Lazy-created; safe to call twice (onerror+onclose).
 // Pass sticky=true to keep it up until hideToast() (e.g. a fetch in progress).
 let toastHideTimer = null;
+let toastSticky = false;
 function showToast(msg, sticky) {
     let el = document.getElementById('connection-toast');
     if (!el) {
@@ -557,6 +559,7 @@ function showToast(msg, sticky) {
     }
     el.textContent = msg;
     el.classList.add('show');
+    toastSticky = !!sticky;
     clearTimeout(toastHideTimer);
     toastHideTimer = null;
     if (!sticky) {
@@ -567,13 +570,21 @@ function showToast(msg, sticky) {
 function hideToast() {
     clearTimeout(toastHideTimer);
     toastHideTimer = null;
+    toastSticky = false;
     const el = document.getElementById('connection-toast');
     if (el) el.classList.remove('show');
+}
+
+// Clear only a sticky (fetch-in-progress) toast — leaves a transient
+// "Connection lost." toast to run out its own timer.
+function hideStickyToast() {
+    if (toastSticky) hideToast();
 }
 
 function finishStream() {
     state = 'IDLE';
     stopBufferReports();
+    hideStickyToast();  // a fetch notice must never outlive the stream
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     if (audioEl) { audioEl.pause(); audioEl.src = ''; }
     ctx.clearRect(0, 0, canvas.width, canvas.height);
