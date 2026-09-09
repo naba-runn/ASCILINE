@@ -233,6 +233,9 @@ function connectWebSocket() {
                 return;
             }
             if (event.data.startsWith('INIT:')) {
+                // First INIT means frames are about to flow — drop any
+                // "fetching..." notification the server sent earlier.
+                hideToast();
                 const p = event.data.split(':');
                 targetFps = parseFloat(p[1]);
                 frameInterval = 1000 / targetFps;
@@ -329,7 +332,16 @@ function connectWebSocket() {
                 return;
 
             }
-            
+
+            // STATUS:<CODE>:<human-readable text> — e.g. the server tells us a
+            // YouTube/ytdlp fetch is starting. MUST return here: any string that
+            // falls through below is parsed as a Mode-1 text frame.
+            if (event.data.startsWith('STATUS:')) {
+                const msgStart = event.data.indexOf(':', 7);
+                if (msgStart !== -1) showToast(event.data.slice(msgStart + 1), true);
+                return;
+            }
+
             // Mode 1: Text Frame with Timestamp
             const text = event.data;
             const newlineIdx = text.indexOf('\n');
@@ -531,8 +543,9 @@ function stopBufferReports() {
 }
 
 // Unexpected disconnect toast. Lazy-created; safe to call twice (onerror+onclose).
+// Pass sticky=true to keep it up until hideToast() (e.g. a fetch in progress).
 let toastHideTimer = null;
-function showToast(msg) {
+function showToast(msg, sticky) {
     let el = document.getElementById('connection-toast');
     if (!el) {
         el = document.createElement('div');
@@ -545,7 +558,17 @@ function showToast(msg) {
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(toastHideTimer);
-    toastHideTimer = setTimeout(() => el.classList.remove('show'), 4000);
+    toastHideTimer = null;
+    if (!sticky) {
+        toastHideTimer = setTimeout(() => el.classList.remove('show'), 4000);
+    }
+}
+
+function hideToast() {
+    clearTimeout(toastHideTimer);
+    toastHideTimer = null;
+    const el = document.getElementById('connection-toast');
+    if (el) el.classList.remove('show');
 }
 
 function finishStream() {

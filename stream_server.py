@@ -636,6 +636,10 @@ async def websocket_endpoint(websocket: WebSocket):
             # instead of re-downloading.
             if isinstance(video_path, str) and ytdl.is_url(video_path):
                 print(f"[YT] fetching ({queue_index + 1}/{len(queue)}) {video_path}")
+                # Only URL entries reach here; a resolved/cached local path is
+                # written back to entry["video"] above, so the client only sees
+                # this when a download/normalize actually has to run.
+                await websocket.send_text("STATUS:FETCHING_YT:Fetching YouTube stream...")
                 try:
                     video_path = await safe_resolve_video_path(video_path)
                     entry["video"] = video_path
